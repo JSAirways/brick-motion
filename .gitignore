@@ -1,10 +1,9 @@
 node_modules/
 dist-electron/
 dist-renderer/
-native/camera-dshow/build/
 native/camera-mf/build/
 release/
 docs/
-.cursor/plans/
+.cursor/
 .DS_Store
 Thumbs.db

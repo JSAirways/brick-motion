@@ -32,6 +32,13 @@
     "url": "https://jonan.space"
   },
   "homepage": "https://jonan.space",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JSAirways/brick-motion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JSAirways/brick-motion/issues"
+  },
   "license": "MIT",
   "dependencies": {
     "bootstrap": "^5.3.8",

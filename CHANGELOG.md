@@ -1,6 +1,6 @@
 # Changelog
 
-All notable releases follow [Semantic Versioning](https://semver.org/) and [VERSIONING.md](docs/VERSIONING.md).
+All notable releases follow [Semantic Versioning](https://semver.org/). Version numbers in `package.json` track shippable builds (installers, support).
 
 ## [1.0.0] - 2026-06-02
 
