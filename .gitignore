@@ -4,5 +4,7 @@ dist-renderer/
 native/camera-dshow/build/
 native/camera-mf/build/
 release/
+docs/
+.cursor/plans/
 .DS_Store
 Thumbs.db
