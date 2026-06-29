@@ -1,6 +1,6 @@
 {
   "name": "brick-motion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Desktop stop-motion app built with Electron and TypeScript.",
   "main": "dist-electron/electron/main.js",
   "scripts": {

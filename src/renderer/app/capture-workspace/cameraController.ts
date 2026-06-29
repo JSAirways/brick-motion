@@ -6,6 +6,7 @@ import { ipcInvokeErrorMessage } from "../../utils/ipcErrorMessage";
 import type { ProjectSession } from "../../../shared/types/project";
 import type { CameraRuntime } from "./cameraRuntime";
 import type { LivePreviewView } from "./livePreviewView";
+import { createPreviewFrameSink } from "./previewFrameSink";
 
 export interface CameraController {
   initCamera: (preferredDeviceId?: string | null, options?: { forceReopen?: boolean }) => Promise<void>;
@@ -91,12 +92,33 @@ export const createCameraController = (params: {
   let livePreviewEl: HTMLImageElement | null = getLivePreviewEl();
   let livePreviewView: LivePreviewView = getLivePreviewView();
 
+  const previewFrameSink = createPreviewFrameSink({
+    getLivePreviewView: () => livePreviewView,
+    getPreviewObjectUrl: () => cameraRuntime.getPreviewObjectUrl(),
+    setPreviewObjectUrl: (url) => {
+      cameraRuntime.setPreviewObjectUrl(url);
+    },
+    currentSessionToken: () => cameraRuntime.currentSessionToken()
+  });
+
+  const deliverPreviewFrame = (jpeg: Uint8Array): void => {
+    if (!jpeg.byteLength || phase === "disconnected" || phase === "idle") {
+      return;
+    }
+    if (phase === "stalled") {
+      setPhase("live");
+      livePreviewView.setStatus("Live camera feed");
+    }
+    previewFrameSink.submit(jpeg);
+  };
+
   const setPhase = (next: CameraPhase): void => {
     phase = next;
   };
 
   const applyDisconnectedState = async (): Promise<void> => {
     setPhase("disconnected");
+    previewFrameSink.reset();
     livePreviewView.setLoading(false);
     livePreviewView.setStatus("Camera disconnected — plug in or choose another device");
     livePreviewView.clearPreview();
@@ -229,28 +251,7 @@ export const createCameraController = (params: {
   const bindPreviewSubscription = (): void => {
     cameraRuntime.setPreviewSubscription(() =>
       window.brickMotion.cameraPreviewSubscribe((jpeg) => {
-        if (!jpeg.byteLength || phase === "disconnected" || phase === "idle") {
-          return;
-        }
-        if (phase === "stalled") {
-          setPhase("live");
-          livePreviewView.setStatus("Live camera feed");
-        }
-        const blob = new Blob([jpeg as BlobPart], { type: "image/jpeg" });
-        const prevUrl = cameraRuntime.getPreviewObjectUrl();
-        const nextUrl = URL.createObjectURL(blob);
-        cameraRuntime.setPreviewObjectUrl(nextUrl);
-        const sessionAtPaint = cameraRuntime.currentSessionToken();
-        const onDecoded = (): void => {
-          if (sessionAtPaint !== cameraRuntime.currentSessionToken()) {
-            URL.revokeObjectURL(nextUrl);
-            return;
-          }
-          if (prevUrl) {
-            URL.revokeObjectURL(prevUrl);
-          }
-        };
-        livePreviewView.setPreviewSource(nextUrl, onDecoded);
+        deliverPreviewFrame(jpeg);
       })
     );
   };
@@ -393,25 +394,7 @@ export const createCameraController = (params: {
           if (!jpeg.byteLength) {
             return;
           }
-          if (phase === "stalled") {
-            setPhase("live");
-            livePreviewView.setStatus("Live camera feed");
-          }
-          const blob = new Blob([jpeg as BlobPart], { type: "image/jpeg" });
-          const prevUrl = cameraRuntime.getPreviewObjectUrl();
-          const nextUrl = URL.createObjectURL(blob);
-          cameraRuntime.setPreviewObjectUrl(nextUrl);
-          const sessionAtPaint = cameraRuntime.currentSessionToken();
-          const onDecoded = (): void => {
-            if (sessionAtPaint !== cameraRuntime.currentSessionToken()) {
-              URL.revokeObjectURL(nextUrl);
-              return;
-            }
-            if (prevUrl) {
-              URL.revokeObjectURL(prevUrl);
-            }
-          };
-          livePreviewView.setPreviewSource(nextUrl, onDecoded);
+          deliverPreviewFrame(jpeg);
         })
       );
 

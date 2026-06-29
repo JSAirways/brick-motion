@@ -68,6 +68,8 @@ export class CameraService {
 
   private lastPreviewGeneration = 0;
 
+  private lastSentPreviewGeneration = 0;
+
   private lastGenerationChangeAt = 0;
 
   private lastRawGeneration = 0;
@@ -305,6 +307,7 @@ export class CameraService {
       }
       const t0 = Date.now();
       this.previewReadInFlight = true;
+      let sentThisTick = false;
       try {
         if (this.capturingFrame) {
           if (this.previewLoopActive) {
@@ -316,21 +319,29 @@ export class CameraService {
         const rawGeneration = (await this.backend.getRawFrameGeneration?.()) ?? 0;
         this.notePreviewGeneration(generation);
         this.noteRawGeneration(rawGeneration);
-        const buf = await this.backend.getPreviewJpeg();
-        if (buf && buf.length > 0 && this.previewTarget && !this.previewTarget.isDestroyed()) {
+        if (generation > 0 && generation === this.lastSentPreviewGeneration) {
           this.consecutivePreviewMisses = 0;
-          this.previewStalledNotified = false;
-          this.sendPreviewJpeg(buf);
-        } else if (!this.capturingFrame) {
-          this.consecutivePreviewMisses += 1;
-          if (
-            this.activeDeviceId &&
-            this.consecutivePreviewMisses >= PREVIEW_UNPLUG_CHECK_MISSES &&
-            this.consecutivePreviewMisses % PREVIEW_UNPLUG_CHECK_MISSES === 0
-          ) {
-            void this.verifyActiveDeviceStillPresent().catch(() => {
-              /* best effort */
-            });
+        } else {
+          const buf = await this.backend.getPreviewJpeg();
+          if (buf && buf.length > 0 && this.previewTarget && !this.previewTarget.isDestroyed()) {
+            this.consecutivePreviewMisses = 0;
+            this.previewStalledNotified = false;
+            this.sendPreviewJpeg(buf);
+            if (generation > 0) {
+              this.lastSentPreviewGeneration = generation;
+            }
+            sentThisTick = true;
+          } else if (!this.capturingFrame) {
+            this.consecutivePreviewMisses += 1;
+            if (
+              this.activeDeviceId &&
+              this.consecutivePreviewMisses >= PREVIEW_UNPLUG_CHECK_MISSES &&
+              this.consecutivePreviewMisses % PREVIEW_UNPLUG_CHECK_MISSES === 0
+            ) {
+              void this.verifyActiveDeviceStillPresent().catch(() => {
+                /* best effort */
+              });
+            }
           }
         }
       } catch (error) {
@@ -363,8 +374,7 @@ export class CameraService {
         return;
       }
       const elapsed = Date.now() - t0;
-      const hadFrame = this.consecutivePreviewMisses === 0;
-      const wait = hadFrame ? 0 : Math.max(0, PREVIEW_POLL_MS - elapsed);
+      const wait = sentThisTick ? 0 : Math.max(0, PREVIEW_POLL_MS - elapsed);
       this.previewTimer = setTimeout(() => void tick(), wait);
     };
     void tick();
@@ -388,6 +398,7 @@ export class CameraService {
       this.activeDeviceId = deviceId;
       this.lastOpenedDeviceId = deviceId;
       this.lastPreviewGeneration = 0;
+      this.lastSentPreviewGeneration = 0;
       this.lastGenerationChangeAt = 0;
       this.lastRawGeneration = 0;
       this.lastRawGenerationChangeAt = 0;
@@ -402,6 +413,7 @@ export class CameraService {
       this.clearPreviewLoop();
       this.activeDeviceId = null;
       this.lastPreviewGeneration = 0;
+      this.lastSentPreviewGeneration = 0;
       this.lastGenerationChangeAt = 0;
       this.lastRawGeneration = 0;
       this.lastRawGenerationChangeAt = 0;

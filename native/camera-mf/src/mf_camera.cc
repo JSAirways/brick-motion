@@ -581,76 +581,126 @@ bool MfCamera::NegotiateFormatFromReader() {
     last_error_ = "negotiation_failed: no reader";
     return false;
   }
-  const DWORD streams[] = {kVideoStreamIndex, 0u, 1u, 2u, 3u};
-  DWORD best_stream = 0;
-  IMFMediaType* best_type = nullptr;
-  int best_score = -1;
-  for (const DWORD stream : streams) {
-    IMFMediaType* candidate = nullptr;
+  struct ReaderFormatCandidate {
+    DWORD stream = 0;
+    IMFMediaType* type = nullptr;
     int score = -1;
-    if (!ProbeBestNativeTypeOnStream(stream, &candidate, &score)) {
-      continue;
-    }
-    if (score > best_score) {
-      if (best_type) {
-        best_type->Release();
+  };
+  std::vector<ReaderFormatCandidate> candidates;
+  candidates.reserve(32);
+  const DWORD streams[] = {kVideoStreamIndex, 0u, 1u, 2u, 3u};
+  for (const DWORD stream : streams) {
+    for (DWORD i = 0; i < 128; ++i) {
+      if (ShouldAbortCapture()) {
+        last_error_ = "open_cancelled";
+        for (const ReaderFormatCandidate& c : candidates) {
+          if (c.type) {
+            c.type->Release();
+          }
+        }
+        return false;
       }
-      best_type = candidate;
-      best_score = score;
-      best_stream = stream;
-    } else {
-      candidate->Release();
+      IMFMediaType* type = nullptr;
+      const HRESULT hr = reader_->GetNativeMediaType(stream, i, &type);
+      if (hr == MF_E_NO_MORE_TYPES) {
+        break;
+      }
+      if (FAILED(hr) || !type) {
+        continue;
+      }
+      UINT32 width = 0;
+      UINT32 height = 0;
+      if (FAILED(MFGetAttributeSize(type, MF_MT_FRAME_SIZE, &width, &height))) {
+        type->Release();
+        continue;
+      }
+      const int score = MjpegModeScore(width, height);
+      if (score < 0) {
+        type->Release();
+        continue;
+      }
+      candidates.push_back({stream, type, score});
     }
   }
-  if (!best_type || best_score < 0) {
+  if (candidates.empty()) {
     last_error_ = "format_negotiation_failed: no suitable mode";
     std::fprintf(stderr, "[camera_mf] %s\n", last_error_.c_str());
     return false;
   }
-  GUID chosen_subtype = {};
-  best_type->GetGUID(MF_MT_SUBTYPE, &chosen_subtype);
-  IMFMediaType* chosen_type = best_type;
-  IMFMediaType* converted_type = nullptr;
-  if (chosen_subtype != MFVideoFormat_MJPG && !IsRgb32Subtype(chosen_subtype)) {
-    UINT32 req_w = 0;
-    UINT32 req_h = 0;
-    MFGetAttributeSize(best_type, MF_MT_FRAME_SIZE, &req_w, &req_h);
-    if (req_w > 0 && req_h > 0 && SUCCEEDED(MFCreateMediaType(&converted_type)) && converted_type) {
-      converted_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-      converted_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
-      MFSetAttributeSize(converted_type, MF_MT_FRAME_SIZE, req_w, req_h);
-      chosen_type = converted_type;
+  std::sort(candidates.begin(), candidates.end(),
+            [](const ReaderFormatCandidate& a, const ReaderFormatCandidate& b) { return a.score > b.score; });
+
+  constexpr size_t kMaxAttempts = 8;
+  const size_t attempt_limit = (std::min)(candidates.size(), kMaxAttempts);
+  for (size_t attempt = 0; attempt < attempt_limit; ++attempt) {
+    const ReaderFormatCandidate& candidate = candidates[attempt];
+    GUID chosen_subtype = {};
+    candidate.type->GetGUID(MF_MT_SUBTYPE, &chosen_subtype);
+    IMFMediaType* chosen_type = candidate.type;
+    IMFMediaType* converted_type = nullptr;
+    if (chosen_subtype != MFVideoFormat_MJPG && !IsRgb32Subtype(chosen_subtype)) {
+      UINT32 req_w = 0;
+      UINT32 req_h = 0;
+      MFGetAttributeSize(candidate.type, MF_MT_FRAME_SIZE, &req_w, &req_h);
+      if (req_w > 0 && req_h > 0 && SUCCEEDED(MFCreateMediaType(&converted_type)) && converted_type) {
+        converted_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
+        converted_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
+        MFSetAttributeSize(converted_type, MF_MT_FRAME_SIZE, req_w, req_h);
+        chosen_type = converted_type;
+      }
+    }
+    const HRESULT setHr = reader_->SetCurrentMediaType(candidate.stream, nullptr, chosen_type);
+    if (FAILED(setHr)) {
+      if (converted_type) {
+        converted_type->Release();
+      }
+      std::fprintf(stderr,
+                   "[camera_mf] SetCurrentMediaType failed: 0x%08lx stream=0x%lx attempt=%zu score=%d\n",
+                   static_cast<unsigned long>(setHr), static_cast<unsigned long>(candidate.stream), attempt + 1,
+                   candidate.score);
+      continue;
+    }
+    UpdateFrameInfoFromMediaType(chosen_type);
+    UINT32 w = 0;
+    UINT32 h = 0;
+    GUID subtype = {};
+    chosen_type->GetGUID(MF_MT_SUBTYPE, &subtype);
+    MFGetAttributeSize(chosen_type, MF_MT_FRAME_SIZE, &w, &h);
+    stream_profile_.stream_index = candidate.stream;
+    stream_profile_.width = w;
+    stream_profile_.height = h;
+    stream_profile_.subtype = subtype;
+    video_stream_index_ = candidate.stream;
+    if (converted_type) {
+      converted_type->Release();
+    }
+    for (size_t i = 0; i < candidates.size(); ++i) {
+      if (candidates[i].type) {
+        candidates[i].type->Release();
+        candidates[i].type = nullptr;
+      }
+    }
+    if (attempt == 0) {
+      std::fprintf(stderr, "[camera_mf] format ok: stream=0x%lx %dx%d subtype=%08lx (score=%d)\n",
+                   static_cast<unsigned long>(candidate.stream), frame_width_, frame_height_,
+                   static_cast<unsigned long>(frame_subtype_.Data1), candidate.score);
+    } else {
+      std::fprintf(stderr,
+                   "[camera_mf] format ok (fallback attempt %zu): stream=0x%lx %dx%d subtype=%08lx (score=%d)\n",
+                   attempt + 1, static_cast<unsigned long>(candidate.stream), frame_width_, frame_height_,
+                   static_cast<unsigned long>(frame_subtype_.Data1), candidate.score);
+    }
+    return true;
+  }
+
+  for (const ReaderFormatCandidate& c : candidates) {
+    if (c.type) {
+      c.type->Release();
     }
   }
-  const HRESULT setHr = reader_->SetCurrentMediaType(best_stream, nullptr, chosen_type);
-  UpdateFrameInfoFromMediaType(chosen_type);
-  UINT32 w = 0;
-  UINT32 h = 0;
-  GUID subtype = {};
-  chosen_type->GetGUID(MF_MT_SUBTYPE, &subtype);
-  MFGetAttributeSize(chosen_type, MF_MT_FRAME_SIZE, &w, &h);
-  stream_profile_.stream_index = best_stream;
-  stream_profile_.width = w;
-  stream_profile_.height = h;
-  stream_profile_.subtype = subtype;
-  if (converted_type) {
-    converted_type->Release();
-  }
-  best_type->Release();
-  if (FAILED(setHr)) {
-    char buf[160];
-    std::snprintf(buf, sizeof(buf), "format_negotiation_failed: SetCurrentMediaType 0x%08lx stream=0x%lx (%dx%d)",
-                  static_cast<unsigned long>(setHr), static_cast<unsigned long>(best_stream), frame_width_,
-                  frame_height_);
-    last_error_ = buf;
-    std::fprintf(stderr, "[camera_mf] %s\n", last_error_.c_str());
-    return false;
-  }
-  video_stream_index_ = best_stream;
-  std::fprintf(stderr, "[camera_mf] format ok: stream=0x%lx %dx%d subtype=%08lx (score=%d)\n",
-               static_cast<unsigned long>(best_stream), frame_width_, frame_height_,
-               static_cast<unsigned long>(frame_subtype_.Data1), best_score);
-  return true;
+  last_error_ = "format_negotiation_failed: SetCurrentMediaType failed for all candidate modes";
+  std::fprintf(stderr, "[camera_mf] %s\n", last_error_.c_str());
+  return false;
 }
 
 bool MfCamera::ExtractRawBytesFromSample(IMFSample* sample, std::vector<uint8_t>& out) const {
@@ -712,9 +762,25 @@ void MfCamera::OnReaderSample(IMFSample* sample, const uint32_t stream_flags) {
     ForceManualCameraModes(source_);
     manual_modes_forced_ = true;
   }
-  if (IngestSample(sample)) {
-    SchedulePreviewEncodeFromCache();
+  if (!IngestSample(sample)) {
+    return;
   }
+  const uint64_t raw_gen = raw_frame_generation_.load(std::memory_order_acquire);
+  bool mjpeg_passthrough = frame_subtype_ == MFVideoFormat_MJPG;
+  if (!mjpeg_passthrough) {
+    std::lock_guard<std::mutex> lock(preview_mu_);
+    mjpeg_passthrough = BufferLooksLikeJpeg(latest_sample_bytes_);
+  }
+  if (mjpeg_passthrough) {
+    std::lock_guard<std::mutex> lock(preview_mu_);
+    if (!latest_sample_bytes_.empty()) {
+      latest_preview_jpeg_ = latest_sample_bytes_;
+      preview_frame_generation_.fetch_add(1, std::memory_order_release);
+      last_encoded_raw_generation_.store(raw_gen, std::memory_order_release);
+    }
+    return;
+  }
+  SchedulePreviewEncodeFromCache();
 }
 
 void MfCamera::KickAsyncPreviewRead() {
