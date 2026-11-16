@@ -20,6 +20,7 @@ Prefer the repository tree and source for file lists. Docs are for invariants an
 - **Validation:** parse/validate `project.json` and create payloads in main before trusting them.
 - **Templates vs runtime:** markup-only under `src/renderer/templates/`; IPC/listeners under `src/renderer/app/`.
 - **Two versions:** `package.json` semver for releases; `project.json` `appVersion` for schema only — see [Schema notes](docs/SCHEMA_NOTES.md).
+- **GitHub Releases:** ship Windows installers via Releases (not git). Always upload both `Brick-Motion-Setup-<version>.exe` and stable `Brick-Motion-Setup.exe` so `/releases/latest/download/Brick-Motion-Setup.exe` keeps working — see [Development — Packaging](docs/DEVELOPMENT.md#packaging-and-github-releases).
 - **Docs** — if behaviour or setup changes, update the matching doc when you can ([Keeping docs in sync](docs/DEVELOPMENT.md#keeping-docs-in-sync)).
 
 ## Security reports

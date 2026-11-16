@@ -11,7 +11,7 @@ Don’t mix these up in UI or code.
 | **Release** (show users) | `package.json` `"version"` (semver) | Installers, About, splash, window title — e.g. **Version 1.0.1** |
 | **Project format** | `project.json` → `appVersion` (integer) | Schema migrations / reject older incompatible files |
 
-Bump release semver for shippable builds. Bump `appVersion` only with migration code in `validateProject.ts`. Sync splash JSON via `npm run sync:app-version` (also `predev` / `prebuild`).
+Bump release semver for shippable builds, update [CHANGELOG.md](../CHANGELOG.md), then publish a GitHub Release with the Windows installer (see [Development — Packaging](DEVELOPMENT.md#packaging-and-github-releases)). Bump `appVersion` only with migration code in `validateProject.ts`. Sync splash JSON via `npm run sync:app-version` (also `predev` / `prebuild`).
 
 Canonical helpers: `src/shared/appInfo.ts`, Electron About panel options in `electron/main.ts`.
 

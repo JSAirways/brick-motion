@@ -6,7 +6,7 @@ Developer notes for the Brick-Motion stop-motion desktop app.
 |----------|-------------|
 | [Technical brief](TECHNICAL_BRIEF.md) | Purpose, feature map, non-goals |
 | [Architecture](ARCHITECTURE.md) | Electron processes, IPC, camera pipeline, menus |
-| [Development](DEVELOPMENT.md) | Setup, scripts, native builds, doc-update map |
+| [Development](DEVELOPMENT.md) | Setup, scripts, native builds, GitHub Releases, doc-update map |
 | [Schema notes](SCHEMA_NOTES.md) | `project.json`, disk layout, versioning |
 | [Conventions](CONVENTIONS.md) | Project-specific coding rules and gotchas |
 

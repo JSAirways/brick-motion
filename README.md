@@ -6,6 +6,14 @@ Built with **Electron**, **TypeScript**, and **Bootstrap**.
 
 **Website:** [jonan.space](https://jonan.space) · **Source:** [github.com/JSAirways/brick-motion](https://github.com/JSAirways/brick-motion)
 
+## Download
+
+Windows installer (always the latest GitHub Release):
+
+**[Download Brick-Motion](https://github.com/JSAirways/brick-motion/releases/latest/download/Brick-Motion-Setup.exe)**
+
+All releases: [github.com/JSAirways/brick-motion/releases](https://github.com/JSAirways/brick-motion/releases). How to publish a new build: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#packaging-and-github-releases).
+
 ## Documentation
 
 Full product and developer docs live in [`docs/`](docs/README.md):
@@ -83,7 +91,7 @@ npm run build
 npm run dist:win
 ```
 
-The installer is written to `release/`. Pre-built Windows installers are published on [GitHub Releases](https://github.com/JSAirways/brick-motion/releases) when available.
+The installer is written to `release/`. Publish it as a GitHub Release (versioned file **plus** stable `Brick-Motion-Setup.exe`) so the [latest download link](https://github.com/JSAirways/brick-motion/releases/latest/download/Brick-Motion-Setup.exe) keeps working — see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#packaging-and-github-releases).
 
 ## Contributing
 
