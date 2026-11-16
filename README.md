@@ -1,10 +1,24 @@
 # Brick-Motion
 
-Brick-Motion is a local-first desktop stop-motion capture app. Shoot frames from your camera, scrub through a timeline, and export image sequences — all stored in a project folder on disk. No accounts, no cloud.
+Brick-Motion is a local-first desktop stop-motion app. Shoot frames from your camera, scrub through a timeline, and export image sequences — all stored in a project folder on disk. No accounts, no cloud.
 
 Built with **Electron**, **TypeScript**, and **Bootstrap**.
 
 **Website:** [jonan.space](https://jonan.space) · **Source:** [github.com/JSAirways/brick-motion](https://github.com/JSAirways/brick-motion)
+
+## Documentation
+
+Full product and developer docs live in [`docs/`](docs/README.md):
+
+- [Technical brief](docs/TECHNICAL_BRIEF.md) — purpose, feature map, non-goals
+- [Architecture](docs/ARCHITECTURE.md) — Electron processes, IPC, camera
+- [Development](docs/DEVELOPMENT.md) — setup, scripts, native builds
+- [Schema notes](docs/SCHEMA_NOTES.md) — `project.json`, disk layout, versioning
+- [Conventions](docs/CONVENTIONS.md) — project coding rules
+
+For AI agents: [AGENTS.md](AGENTS.md). For contributors: [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
+
+When behaviour or setup changes, it’s helpful to keep docs in sync — see [Keeping docs in sync](docs/DEVELOPMENT.md#keeping-docs-in-sync).
 
 ## Features
 
@@ -29,6 +43,14 @@ npm run dev
 
 This starts the Vite dev server and launches Electron. The renderer hot-reloads on save.
 
+For camera capture on Windows:
+
+```bash
+npm run rebuild:native
+```
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [native/camera-mf/README.md](native/camera-mf/README.md) for build requirements.
+
 ## Scripts
 
 | Command | Description |
@@ -48,6 +70,7 @@ brick-motion/
 ├── src/renderer/      # UI (TypeScript + SCSS)
 ├── src/shared/        # Types and validation shared across processes
 ├── native/camera-mf/  # Windows Media Foundation camera addon
+├── docs/              # Developer documentation
 ├── public/            # Static assets (icons, splash screens)
 └── scripts/           # Build helpers
 ```
@@ -64,12 +87,15 @@ The installer is written to `release/`. Pre-built Windows installers are publish
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests: [open an issue](https://github.com/JSAirways/brick-motion/issues).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and a few practical notes. For vulnerabilities, see [SECURITY.md](SECURITY.md).
+
+## Author
+
+**Jonan Steiner**
+
+- Email: [jonan.steiner@gmail.com](mailto:jonan.steiner@gmail.com)
+- Website: [jonan.space](https://jonan.space)
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-## Author
-
-**Jonan Steiner** — [jonan.space](https://jonan.space) · [jonan.steiner@gmail.com](mailto:jonan.steiner@gmail.com)

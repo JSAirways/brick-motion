@@ -3,7 +3,6 @@ dist-electron/
 dist-renderer/
 native/camera-mf/build/
 release/
-docs/
 .cursor/
 .DS_Store
 Thumbs.db
